@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spotify Pixel Player</title>
+  <style>
+    body {
+      background: black;
+      color: white;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .player {
+      border: 2px solid white;
+      padding: 10px;
+      width: 300px;
+    }
+    .track {
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .progress-bar {
+      background: white;
+      height: 8px;
+      width: 100%;
+      margin: 5px 0;
+      position: relative;
+    }
+    .progress {
+      background: black;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .times {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    #login {
+      background: white;
+      color: black;
+      padding: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="player" id="player">
+    <div class="track" id="track">Not connected</div>
+    <div class="progress-bar">
+      <div class="progress" id="progress"></div>
+    </div>
+    <div class="times">
+      <span id="current">--:--</span>
+      <span id="duration">--:--</span>
+    </div>
+    <div id="login">Login with Spotify</div>
+  </div>
+
+  <script>
+    const clientId = 'd62661e661434e27aff7288ccce5cd28'; // TU WSTAW SWÓJ CLIENT ID
+    const redirectUri = 'https://lospixelos.github.io/spotify_pixel_player.html'; // Użyj GitHub Pages jako hosta
+    const scopes = 'user-read-playback-state';
+
+    function msToTime(ms) {
+      const minutes = Math.floor(ms / 60000);
+      const seconds = ((ms % 60000) / 1000).toFixed(0);
+      return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
+    }
+
+    function getHashParams() {
+      const hash = window.location.hash.substring(1);
+      const params = {};
+      hash.split('&').forEach(kv => {
+        const [key, value] = kv.split('=');
+        params[key] = value;
+      });
+      return params;
+    }
+
+    function login() {
+      const url = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`;
+      window.location = url;
+    }
+
+    async function fetchPlayback(token) {
+      const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.status === 204 || res.status === 202) return;
+
+      const data = await res.json();
+      const name = data.item.name;
+      const artist = data.item.artists.map(a => a.name).join(', ');
+      const duration = data.item.duration_ms;
+      const progress = data.progress_ms;
+
+      document.getElementById('track').innerText = artist + ' – ' + name;
+      document.getElementById('current').innerText = msToTime(progress);
+      document.getElementById('duration').innerText = msToTime(duration);
+      const progressWidth = (progress / duration) * 100;
+      document.getElementById('progress').style.width = `${progressWidth}%`;
+    }
+
+    window.onload = () => {
+      const params = getHashParams();
+      const token = params.access_token;
+
+      if (!token) {
+        document.getElementById('login').onclick = login;
+      } else {
+        document.getElementById('login').style.display = 'none';
+        fetchPlayback(token);
+        setInterval(() => fetchPlayback(token), 3000);
+      }
+    };
+  </script>
+</body>
+</html>
